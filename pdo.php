@@ -1,16 +1,19 @@
 <?php
-
+//SHOW VARIABLES LIKE 'socket';-> /Applications/MAMP/tmp/mysql/mysql.sock
 class Database extends PDO
 {
     public function __construct(
         string $dbname,
-        string $user = 'root',
-        string $password = 'root',
-        string $socket = '/Applications/MAMP/tmp/mysql/mysql.sock',
+        string $user,
+        string $password,
+        string $socket = NULL,
         string $charset = 'utf8mb4'
     ) {
-        $dsn = "mysql:unix_socket={$socket};dbname={$dbname};charset={$charset}";
-
+        
+        //for information SQL QUERY => SHOW VARIABLES LIKE 'socket' to see $socket;
+       
+         $dsn = $socket != NULL ? "mysql:unix_socket={$socket};dbname={$dbname};charset={$charset}":"mysql:dbname={$dbname};charset={$charset}";
+        
         $options = [
             PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
@@ -43,8 +46,7 @@ class Database extends PDO
     }
 }
 
-
-
-$db = new Database('app_db');
-echo 'ok';
-//$user = $db->fetchOne('SELECT * FROM users WHERE email = :email', ['email' => $email]);
+$db = new Database('app_db','root','root');
+$toto=1;
+$user = $db->fetchOne('SELECT * FROM titi WHERE id = :titi', ['titi' => $toto]);
+var_dump($user);
