@@ -1,5 +1,49 @@
 <?php
-//SHOW VARIABLES LIKE 'socket';-> /Applications/MAMP/tmp/mysql/mysql.sock
+
+class IniConfig
+{
+    private $data;
+
+    public function __construct(string $filePath, bool $processSections = true)
+    {
+        if (!is_file($filePath) || !is_readable($filePath)) {
+            throw new RuntimeException("Fichier INI introuvable ou illisible : {$filePath}");
+        }
+
+        $result = @parse_ini_file($filePath, $processSections, INI_SCANNER_TYPED);
+
+        if ($result === false) {
+            $error = error_get_last();
+            throw new RuntimeException(
+                "Erreur lors du parsing du fichier INI : " . ($error['message'] ?? 'inconnue')
+            );
+        }
+
+        $this->data = $result;
+    }
+    
+
+    public function all(): array
+    {
+        return $this->data;
+    }
+
+    public function get(string $section, ?string $key = null)
+    {
+        if (!isset($this->data[$section])) {
+            return null;
+        }
+
+        if ($key === null) {
+            return $this->data[$section];
+        }
+
+        return $this->data[$section][$key] ?? null;
+    }
+}
+
+
+
 class Database extends PDO
 {
     public function __construct(
@@ -27,6 +71,7 @@ class Database extends PDO
         }
     }
 
+
     public function run(string $sql, array $params = []): PDOStatement
     {
         $stmt = $this->prepare($sql);
@@ -46,7 +91,23 @@ class Database extends PDO
     }
 }
 
-$db = new Database('app_db','root','root');
+/*
+$db = new Database('app_db','root','root','/Applications/MAMP/tmp/mysql/mysql.sock');
+$toto=1;
+$user = $db->fetchOne('SELECT * FROM titi WHERE id = :titi', ['titi' => $toto]);
+var_dump($user);
+*/
+
+
+$config = new IniConfig('/Users/thomasetanne-marie/Sites/localhost/public/config/settings.ini');
+$dbConf = $config->get('database');
+
+$db = new Database(
+    $dbConf['db_name'],
+    $dbConf['user_name'],
+    $dbConf['password'],
+    $dbConf['sql_sock']
+);
 $toto=1;
 $user = $db->fetchOne('SELECT * FROM titi WHERE id = :titi', ['titi' => $toto]);
 var_dump($user);
