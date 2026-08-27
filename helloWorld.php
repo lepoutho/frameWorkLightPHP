@@ -26,6 +26,7 @@ if ($mysqli->connect_error) {
 
 
 
+
 echo "\nConnexion à la base de données réussie,  bien!";
 $mysqli->close();
 */
