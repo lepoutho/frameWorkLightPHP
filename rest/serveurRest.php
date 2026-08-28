@@ -1,30 +1,47 @@
 <?php
 
 /**
- * Endpoint REST minimal : reçoit un POST, renvoie des données JSON.
- * Pour l'instant, données "en dur" (le but est de valider le mécanisme AJAX).
+ * Dispatcher REST : route chaque verbe HTTP vers un fichier d'action dédié.
+ * Données en dur pour l'instant (le but est de valider le mécanisme de routage) :
+ * pas de vraie persistance, chaque requête repart d'un jeu de données fixe.
  */
 
 header('Content-Type: application/json; charset=utf-8');
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+// Pour GET, les paramètres viennent de la query string ($_GET).
+// Pour POST/PUT/PATCH/DELETE, le corps est du JSON à décoder.
+$method = $_SERVER['REQUEST_METHOD'];
+
+if ($method === 'GET') {
+    $input = $_GET;
+} else {
+    $rawBody = file_get_contents('php://input');
+    $input = json_decode($rawBody, true);
+
+    if ($rawBody !== '' && json_last_error() !== JSON_ERROR_NONE) {
+        http_response_code(400); // Bad Request
+        echo json_encode(['success' => false, 'error' => 'JSON invalide dans le corps de la requête']);
+        exit;
+    }
+
+    $input = $input ?? [];
+}
+
+$routes = [
+    'GET'    => __DIR__ . '/actions/getAction.php',
+    'POST'   => __DIR__ . '/actions/createAction.php',
+    'PUT'    => __DIR__ . '/actions/updateAction.php',
+    'PATCH'  => __DIR__ . '/actions/updateAction.php',
+    'DELETE' => __DIR__ . '/actions/deleteAction.php',
+];
+
+if (!isset($routes[$method])) {
     http_response_code(405); // Method Not Allowed
-    echo json_encode(['error' => 'Méthode non autorisée, utilisez POST']);
+    echo json_encode(['success' => false, 'error' => "Méthode {$method} non supportée"]);
     exit;
 }
 
-// Exemple de lecture d'un paramètre envoyé par le client (facultatif ici)
-$nom = $_POST['nom'] ?? null;
+// Chaque fichier d'action doit se terminer par : return [...tableau de réponse...];
+$result = require $routes[$method];
 
-$data = [
-    'success' => true,
-    'message' => $nom !== null ? "Bonjour {$nom} !" : 'Bonjour !',
-    'items'   => [
-        ['id' => 1, 'label' => 'Premier élément'],
-        ['id' => 2, 'label' => 'Deuxième élément'],
-        ['id' => 3, 'label' => 'Troisième élément'],
-    ],
-    'timestamp' => date('c'),
-];
-
-echo json_encode($data, JSON_UNESCAPED_UNICODE);
+echo json_encode($result, JSON_UNESCAPED_UNICODE);
