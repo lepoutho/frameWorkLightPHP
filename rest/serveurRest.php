@@ -6,6 +6,10 @@
  * pas de vraie persistance, chaque requête repart d'un jeu de données fixe.
  */
 
+session_start(); // nécessaire pour retrouver le token CSRF stocké en session
+
+require_once __DIR__ . '/../autoload.php';
+
 header('Content-Type: application/json; charset=utf-8');
 
 // Pour GET, les paramètres viennent de la query string ($_GET).
@@ -25,6 +29,14 @@ if ($method === 'GET') {
     }
 
     $input = $input ?? [];
+
+    // GET est en lecture seule (pas d'effet de bord) : pas besoin de CSRF.
+    // Tout le reste modifie potentiellement des données → token obligatoire.
+    if (!Csrf::isValid($input['csrf_token'] ?? null)) {
+        http_response_code(403); // Forbidden
+        echo json_encode(['success' => false, 'error' => 'Token CSRF invalide ou manquant']);
+        exit;
+    }
 }
 
 $routes = [

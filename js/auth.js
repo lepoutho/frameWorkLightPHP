@@ -3,20 +3,35 @@
 
 document.addEventListener('DOMContentLoaded', function () {
     const resultatEl = document.getElementById('resultat');
+    let csrfToken = null;
+
+    // Récupère le token CSRF une fois au chargement de la page.
+    // Toute requête POST devra ensuite le renvoyer pour être acceptée par le serveur.
+    async function recupererCsrfToken() {
+        const response = await fetch(window.AUTH_URL + '?action=csrf', { credentials: 'same-origin' });
+        const data = await response.json();
+        csrfToken = data.csrf_token;
+    }
 
     async function appelAuth(action, method, body) {
         resultatEl.textContent = 'Chargement...';
 
         try {
+            if (csrfToken === null) {
+                await recupererCsrfToken();
+            }
+
             const url = window.AUTH_URL + '?action=' + encodeURIComponent(action);
             const options = {
                 method: method,
                 credentials: 'same-origin' // envoie/reçoit le cookie de session PHPSESSID
             };
 
-            if (body) {
+            if (method !== 'GET') {
+                // On ajoute systématiquement le token CSRF aux requêtes qui modifient l'état.
+                const bodyAvecToken = Object.assign({}, body || {}, { csrf_token: csrfToken });
                 options.headers = { 'Content-Type': 'application/json' };
-                options.body = JSON.stringify(body);
+                options.body = JSON.stringify(bodyAvecToken);
             }
 
             const response = await fetch(url, options);
@@ -49,4 +64,8 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('btnMe').addEventListener('click', function () {
         appelAuth('me', 'GET', null);
     });
+
+    // Pré-charge le token dès l'arrivée sur la page (facultatif, évite un aller-retour
+    // supplémentaire au premier clic sur un bouton qui modifie l'état).
+    recupererCsrfToken();
 });
