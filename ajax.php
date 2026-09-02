@@ -3,11 +3,14 @@
 require_once __DIR__ . '/autoload.php';
 
 $config = new IniConfig(__DIR__ . '/config/settings.ini');
-$restUrl = $config->get('POST', 'url');
+$baseUrl = $config->get('app', 'base_url');
+$restPath = $config->get('POST', 'path');
 
-if ($restUrl === null) {
-    throw new RuntimeException("Clé 'url' introuvable dans la section [POST] de settings.ini");
+if ($baseUrl === null || $restPath === null) {
+    throw new RuntimeException("Clé 'base_url' ([app]) ou 'path' ([POST]) introuvable dans settings.ini");
 }
+
+$restUrl = rtrim($baseUrl, '/') . '/' . ltrim($restPath, '/');
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -28,7 +31,7 @@ if ($restUrl === null) {
 
     <script>
         // URL injectée côté serveur depuis config/settings.ini (section [POST])
-        const REST_URL = <?php echo json_encode($restUrl); ?>;
+        const REST_URL = <?php echo json_encode($restUrl, JSON_UNESCAPED_SLASHES); ?>;
 
         const resultatEl = document.getElementById('resultat');
 

@@ -3,11 +3,14 @@
 require_once __DIR__ . '/autoload.php';
 
 $config = new IniConfig(__DIR__ . '/config/settings.ini');
-$authUrl = $config->get('AUTH', 'url');
+$baseUrl = $config->get('app', 'base_url');
+$authPath = $config->get('AUTH', 'path');
 
-if ($authUrl === null) {
-    throw new RuntimeException("Clé 'url' introuvable dans la section [AUTH] de settings.ini");
+if ($baseUrl === null || $authPath === null) {
+    throw new RuntimeException("Clé 'base_url' ([app]) ou 'path' ([AUTH]) introuvable dans settings.ini");
 }
+
+$authUrl = rtrim($baseUrl, '/') . '/' . ltrim($authPath, '/');
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -34,7 +37,7 @@ if ($authUrl === null) {
     <script>
         // Seule valeur injectée depuis le PHP (lue dans config/settings.ini) ;
         // le reste de la logique vit dans js/auth.js
-        window.AUTH_URL = <?php echo json_encode($authUrl); ?>;
+        window.AUTH_URL = <?php echo json_encode($authUrl, JSON_UNESCAPED_SLASHES); ?>;
     </script>
     <script src="js/auth.js"></script>
 </body>
