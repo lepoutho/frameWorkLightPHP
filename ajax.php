@@ -5,12 +5,16 @@ require_once __DIR__ . '/autoload.php';
 $config = new IniConfig(__DIR__ . '/config/settings.ini');
 $baseUrl = $config->get('app', 'base_url');
 $restPath = $config->get('POST', 'path');
+$authPath = $config->get('AUTH', 'path');
 
-if ($baseUrl === null || $restPath === null) {
-    throw new RuntimeException("Clé 'base_url' ([app]) ou 'path' ([POST]) introuvable dans settings.ini");
+if ($baseUrl === null || $restPath === null || $authPath === null) {
+    throw new RuntimeException("Clé 'base_url', 'POST.path' ou 'AUTH.path' introuvable dans settings.ini");
 }
 
 $restUrl = rtrim($baseUrl, '/') . '/' . ltrim($restPath, '/');
+// Le token CSRF est fourni par l'endpoint d'authentification (route ?action=csrf),
+// commun à tout le site puisqu'il est lié à la session, pas à une route en particulier.
+$csrfUrl = rtrim($baseUrl, '/') . '/' . ltrim($authPath, '/') . '?action=csrf';
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -30,39 +34,46 @@ $restUrl = rtrim($baseUrl, '/') . '/' . ltrim($restPath, '/');
     <pre id="resultat">(résultat affiché ici)</pre>
 
     <script>
-        // URL injectée côté serveur depuis config/settings.ini (section [POST])
+        // URLs injectées côté serveur depuis config/settings.ini
         const REST_URL = <?php echo json_encode($restUrl, JSON_UNESCAPED_SLASHES); ?>;
+        const CSRF_URL = <?php echo json_encode($csrfUrl, JSON_UNESCAPED_SLASHES); ?>;
 
         const resultatEl = document.getElementById('resultat');
+        let csrfToken = null;
 
-        function appelRest(method, params, body) {
+        async function recupererCsrfToken() {
+            const response = await fetch(CSRF_URL, { credentials: 'same-origin' });
+            const data = await response.json();
+            csrfToken = data.csrf_token;
+        }
+
+        async function appelRest(method, params, body) {
             resultatEl.textContent = 'Chargement...';
 
-            let url = REST_URL;
-            const options = { method: method, headers: {} };
+            try {
+                let url = REST_URL;
+                const options = { method: method, headers: {}, credentials: 'same-origin' };
 
-            if (method === 'GET') {
-                const query = new URLSearchParams(params || {}).toString();
-                if (query) {
-                    url += '?' + query;
+                if (method === 'GET') {
+                    const query = new URLSearchParams(params || {}).toString();
+                    if (query) {
+                        url += '?' + query;
+                    }
+                } else {
+                    if (csrfToken === null) {
+                        await recupererCsrfToken();
+                    }
+                    const bodyAvecToken = Object.assign({}, body || {}, { csrf_token: csrfToken });
+                    options.headers['Content-Type'] = 'application/json';
+                    options.body = JSON.stringify(bodyAvecToken);
                 }
-            } else {
-                options.headers['Content-Type'] = 'application/json';
-                options.body = JSON.stringify(body || {});
-            }
 
-            fetch(url, options)
-                .then(function (response) {
-                    return response.json().then(function (data) {
-                        return { status: response.status, data: data };
-                    });
-                })
-                .then(function (result) {
-                    resultatEl.textContent = 'HTTP ' + result.status + '\n' + JSON.stringify(result.data, null, 2);
-                })
-                .catch(function (error) {
-                    resultatEl.textContent = 'Erreur : ' + error.message;
-                });
+                const response = await fetch(url, options);
+                const data = await response.json();
+                resultatEl.textContent = 'HTTP ' + response.status + '\n' + JSON.stringify(data, null, 2);
+            } catch (error) {
+                resultatEl.textContent = 'Erreur : ' + error.message;
+            }
         }
 
         document.getElementById('btnGet').addEventListener('click', function () {
